@@ -1,6 +1,7 @@
-# include <iostream>
-# include <random>
-# include <cassert>
+#include <iostream>
+#include <random>
+#include <cassert>
+#include <chrono>
 using std::cout;
 using std::endl;
 
@@ -118,9 +119,50 @@ double enumerate_forward_probability_scaling(double*** p_transition, double** al
 	return log_px;
 }
 
+// 高速版
+double _enumerate_forward_probability_scaling(double*** p_transition, double** alpha, double* scaling, int seq_length, int max_word_length){
+	for(int t = 1;t <= seq_length;t++){
+		// cout << "t = " << t << endl;
+		double prod_scaling = 1;
+		double sum_alpha = 0;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			alpha[t][k] = 0;
+			if(k > 1){
+				prod_scaling *= scaling[t - k + 1];
+			}
+			if(t - k == 0){
+				alpha[t][k] = p_transition[t][k][0] * prod_scaling;
+				sum_alpha += alpha[t][k];
+				continue;
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				alpha[t][k] += p_transition[t][k][j] * alpha[t - k][j] * prod_scaling;
+			}
+			sum_alpha += alpha[t][k];
+		}
+		// assert(sum_alpha <= 1.0);
+		scaling[t] = 1.0 / sum_alpha;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			alpha[t][k] *= scaling[t];
+		}
+	}
+	// <eos>への遷移を考える
+	double alpha_t_1 = 0;
+	int t = seq_length + 1;
+	for(int j = 1;j <= std::min(t, max_word_length);j++){
+		alpha_t_1 += alpha[t - 1][j] * p_transition[t][1][j];
+	}
+	scaling[t] = 1.0 / alpha_t_1;
+	double log_px = 0;
+	for(int m = 1;m <= t;m++){
+		log_px += log(1.0 / scaling[m]);
+	}
+	return log_px;
+}
+
 // tは番号なので1から始まることに注意
 int main(int argc, char *argv[]){
-	int seq_length = 100;
+	int seq_length = 200;
 	int max_word_length = 10;
 	// 前向き確率
 	double** alpha = new double*[seq_length + 1];
@@ -151,12 +193,45 @@ int main(int argc, char *argv[]){
 	// スケーリング係数
 	double* scaling = new double[seq_length + 2];
 
-	double log_px_true = enumerate_forward_probability_naive(p_transition, alpha, seq_length, max_word_length);
+	int repeat = 1000;
+	double log_px_true, log_px_logsumexp, log_px_scaling, _log_px_scaling;
+
+    auto start = std::chrono::system_clock::now();
+    for(int r = 0;r < repeat;r++){
+		log_px_true = enumerate_forward_probability_naive(p_transition, alpha, seq_length, max_word_length);
+    }
+    auto end = std::chrono::system_clock::now();
+    auto diff = end - start;
+    cout << "naive:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
+    start = std::chrono::system_clock::now();
+    for(int r = 0;r < repeat;r++){
+		log_px_logsumexp = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
+	}
+    end = std::chrono::system_clock::now();
+    diff = end - start;
+    cout << "logsumexp:	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
+    start = std::chrono::system_clock::now();
+    for(int r = 0;r < repeat;r++){
+		log_px_scaling = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
+	}
+    end = std::chrono::system_clock::now();
+    diff = end - start;
+    cout << "scaling:	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
+    start = std::chrono::system_clock::now();
+    for(int r = 0;r < repeat;r++){
+		_log_px_scaling = _enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
+	}
+    end = std::chrono::system_clock::now();
+    diff = end - start;
+    cout << "_scaling:	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
 	cout << log_px_true << endl;
-	double log_px_logsumexp = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
 	cout << log_px_logsumexp << endl;
-	double log_px_scaling = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
 	cout << log_px_scaling << endl;
+	cout << _log_px_scaling << endl;
 
 	for(int t = 0;t < seq_length + 1;t++){
 		for(int k = 0;k < max_word_length + 1;k++){
