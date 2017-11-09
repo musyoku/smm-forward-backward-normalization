@@ -1,5 +1,6 @@
 # include <iostream>
 # include <random>
+# include <cassert>
 using std::cout;
 using std::endl;
 
@@ -22,7 +23,7 @@ double enumerate_forward_probability_naive(double*** p_transition, double** alph
 	for(int k = 1;k <= std::min(seq_length, max_word_length);k++){
 		px += alpha[t][k] * p_transition[t + 1][1][k];
 	}
-	return px;
+	return log(px);
 }
 
 double enumerate_forward_probability_logsumexp(double*** p_transition, double** alpha, double* log_z, int seq_length, int max_word_length){
@@ -38,32 +39,41 @@ double enumerate_forward_probability_logsumexp(double*** p_transition, double** 
 			}
 		}
 		if(t == 1){
-
+			log_z[t] = log(alpha[t][1]);
+			alpha[t][1] = 1;
+			continue;
 		}
-		double sum_exp = 0;
 		// 最大値を求める
 		double max_log_z = 0;
-
-		if(t - k == 0){
-			double tmp = log(alpha[t][k][0]) + _log_z[t - k];
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			double tmp = log(alpha[t][k]) + log_z[t - k];
 			if(max_log_z == 0 || tmp > max_log_z){
 				max_log_z = tmp;
 			}
 		}
-		for(int j = 1;j <= std::min(t - k, _max_word_length);j++){
-			double tmp = log(alpha[t][k][j]) + _log_z[t - k];
-			if(max_log_z == 0 || tmp > max_log_z){
-				max_log_z = tmp;
-			}
+		// 求めた最大値をもとにlogsumexp
+		double sum_exp = 0;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			sum_exp += exp(log(alpha[t][k]) + log_z[t - k] - max_log_z);
 		}
+		double log_z_t = log(sum_exp) + max_log_z;
+		// 正規化
+		assert(log_z_t != 0);
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			alpha[t][k] = exp(log(alpha[t][k]) + log_z[t - k] - log_z_t);
+		}
+		log_z[t] = log_z_t;
+		continue;
 	}
 	// <eos>への遷移を考える
-	double px = 0;
-	int t = seq_length;
-	for(int k = 1;k <= std::min(seq_length, max_word_length);k++){
-		px += alpha[t][k] * p_transition[t + 1][1][k];
+	double alpha_t_1 = 0;
+	int t = seq_length + 1;
+	for(int k = 1;k <= std::min(t, max_word_length);k++){
+		alpha_t_1 += alpha[t - 1][k] * p_transition[t][1][k];
 	}
-	return px;
+	double log_z_t = log(alpha_t_1) + log_z[t - 1];
+	alpha_t_1 = exp(log(alpha_t_1) + log_z[t - 1] - log_z_t);	// 正規化
+	return log(alpha_t_1) + log_z_t;							// 正規化を元に戻す
 }
 
 // tは番号なので1から始まることに注意
@@ -97,8 +107,10 @@ int main(int argc, char *argv[]){
 	// 正規化定数（logsumexp用）
 	double* log_z = new double[seq_length + 1];
 
-	double px_true = enumerate_forward_probability_naive(p_transition, alpha, seq_length, max_word_length);
-	cout << px_true << endl;
+	double log_px_true = enumerate_forward_probability_naive(p_transition, alpha, seq_length, max_word_length);
+	cout << log_px_true << endl;
+	double log_px_logsumexp = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
+	cout << log_px_logsumexp << endl;
 
 	for(int t = 0;t < seq_length + 1;t++){
 		for(int k = 0;k < max_word_length + 1;k++){
