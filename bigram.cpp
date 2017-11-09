@@ -72,13 +72,55 @@ double enumerate_forward_probability_logsumexp(double*** p_transition, double** 
 		alpha_t_1 += alpha[t - 1][k] * p_transition[t][1][k];
 	}
 	double log_z_t = log(alpha_t_1) + log_z[t - 1];
+	// return log_z_t;	// 実はこれを返してもよい。なぜなら正規化定数は前向き確率そのもの
 	alpha_t_1 = exp(log(alpha_t_1) + log_z[t - 1] - log_z_t);	// 正規化
 	return log(alpha_t_1) + log_z_t;							// 正規化を元に戻す
 }
 
+double enumerate_forward_probability_scaling(double*** p_transition, double** alpha, double* scaling, int seq_length, int max_word_length){
+	for(int t = 1;t <= seq_length;t++){
+		// cout << "t = " << t << endl;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			alpha[t][k] = 0;
+			double prod_scaling = 1;
+			for(int m = t - k + 1;m <= t - 1;m++){
+				prod_scaling *= scaling[m];
+			}
+			if(t - k == 0){
+				alpha[t][k] = p_transition[t][k][0] * prod_scaling;
+				continue;
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				alpha[t][k] += p_transition[t][k][j] * alpha[t - k][j] * prod_scaling;
+			}
+		}
+		double sum_alpha = 0;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			sum_alpha += alpha[t][k];
+		}
+		// assert(sum_alpha <= 1.0);
+		scaling[t] = 1.0 / sum_alpha;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			alpha[t][k] *= scaling[t];
+		}
+	}
+	// <eos>への遷移を考える
+	double alpha_t_1 = 0;
+	int t = seq_length + 1;
+	for(int j = 1;j <= std::min(t, max_word_length);j++){
+		alpha_t_1 += alpha[t - 1][j] * p_transition[t][1][j];
+	}
+	scaling[t] = 1.0 / alpha_t_1;
+	double log_px = 0;
+	for(int m = 1;m <= t;m++){
+		log_px += log(1.0 / scaling[m]);
+	}
+	return log_px;
+}
+
 // tは番号なので1から始まることに注意
 int main(int argc, char *argv[]){
-	int seq_length = 10;
+	int seq_length = 100;
 	int max_word_length = 10;
 	// 前向き確率
 	double** alpha = new double*[seq_length + 1];
@@ -106,11 +148,15 @@ int main(int argc, char *argv[]){
 	}
 	// 正規化定数（logsumexp用）
 	double* log_z = new double[seq_length + 1];
+	// スケーリング係数
+	double* scaling = new double[seq_length + 2];
 
 	double log_px_true = enumerate_forward_probability_naive(p_transition, alpha, seq_length, max_word_length);
 	cout << log_px_true << endl;
 	double log_px_logsumexp = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
 	cout << log_px_logsumexp << endl;
+	double log_px_scaling = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
+	cout << log_px_scaling << endl;
 
 	for(int t = 0;t < seq_length + 1;t++){
 		for(int k = 0;k < max_word_length + 1;k++){
@@ -124,4 +170,5 @@ int main(int argc, char *argv[]){
 	delete[] alpha;
 	delete[] beta;
 	delete[] log_z;
+	delete[] scaling;
 }
