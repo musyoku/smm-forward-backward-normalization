@@ -104,41 +104,45 @@ double enumerate_forward_probability_logsumexp(double*** p_transition, double** 
 double enumerate_backward_probability_logsumexp(double*** p_transition, double** beta, double* log_z, int seq_length, int max_word_length){
 	int t = seq_length;
 	beta[t + 1][1] = 1;
-	log_z[t + 1] = beta[t + 1][1];
-	for(int t = seq_length - 1;t >= 1;t--){
+	log_z[t + 1] = 0; 		// log(1) = 0
+	for(int t = seq_length - 1;t >= 0;t--){
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
 			beta[t + k][k] = 0;
+			if(seq_length - t - k == 0){	// <eos>への遷移
+				beta[t + k][k] = p_transition[t + k + 1][1][k];
+				continue;
+			}
 			for(int j = 1;j <= std::min(seq_length - t - k, max_word_length);j++){
 				// cout << "beta[" << t + k << "][" << k << "] += " << "p_transition[" << t + j << "][" << j << "][" << k << "] * beta[" << t + k + j << "][" << j << "]" << endl;
-				beta[t + k][k] += p_transition[t + j][j][k] * beta[t + k + j][j];
+				beta[t + k][k] += p_transition[t + k + j][j][k] * beta[t + k + j][j];
 			}
+			assert(0 < beta[t + k][k] && beta[t + k][k] < 1.0);
 		}
 		// 最大値を求める
 		double max_log_z = 0;
-		for(int j = 1;j <= std::min(seq_length - t, max_word_length);j++){
-			double tmp = log(beta[t + j][j]) + log_z[t + j + 1];
+		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
+			double tmp = log(beta[t + k][k]) + log_z[t + k + 1];
 			if(max_log_z == 0 || tmp > max_log_z){
 				max_log_z = tmp;
 			}
 		}
 		// 求めた最大値をもとにlogsumexp
 		double sum_exp = 0;
-		for(int j = 1;j <= std::min(seq_length - t, max_word_length);j++){
-			sum_exp += exp(log(beta[t + j][j]) + log_z[t + j + 1] - max_log_z);
+		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
+			sum_exp += exp(log(beta[t + k][k]) + log_z[t + k + 1] - max_log_z);
 		}
 		double log_z_t = log(sum_exp) + max_log_z;
 		// 正規化
 		assert(log_z_t != 0);
-		for(int j = 1;j <= std::min(seq_length - t, max_word_length);j++){
-			beta[t][j] = exp(log(beta[t + j][j]) + log_z[t + j + 1] - log_z_t);
+		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
+			beta[t + k][k] = exp(log(beta[t + k][k]) + log_z[t + k + 1] - log_z_t);
 		}
-		log_z[t] = log_z_t;
+		log_z[t + 1] = log_z_t;
 		continue;
 	}
 	double px = 0;
-	t = 0;
 	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
-		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[j + 1]);
+		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[1]);
 	}
 	return log(px);
 }
@@ -225,9 +229,15 @@ double _enumerate_forward_probability_scaling(double*** p_transition, double** a
 	return log_px;
 }
 
+void init_log_z(double* log_z, int seq_length){
+	for(int t = 0;t <= seq_length;t++){
+		log_z[t] = -1;
+	}
+}
+
 // tは番号なので1から始まることに注意
 int main(int argc, char *argv[]){
-	int seq_length = 200;
+	int seq_length = 100;
 	int max_word_length = 10;
 	// 前向き確率
 	double** alpha = new double*[seq_length + 1];
@@ -272,6 +282,7 @@ int main(int argc, char *argv[]){
 	auto diff = end - start;
 	cout << "naive:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
+	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
 		log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
@@ -311,6 +322,7 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "naive:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
+	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
 		log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
