@@ -101,6 +101,7 @@ double enumerate_forward_probability_logsumexp(double*** p_transition, double** 
 	return log(alpha_t_1) + log_z_t;							// 正規化を元に戻す
 }
 
+// 時刻tでbeta[t + k][k]を全てのkについて更新する
 double enumerate_backward_probability_logsumexp(double*** p_transition, double** beta, double* log_z, int seq_length, int max_word_length){
 	int t = seq_length;
 	beta[t + 1][1] = 1;
@@ -149,7 +150,6 @@ double enumerate_backward_probability_logsumexp(double*** p_transition, double**
 
 double enumerate_forward_probability_scaling(double*** p_transition, double** alpha, double* scaling, int seq_length, int max_word_length){
 	for(int t = 1;t <= seq_length;t++){
-		// cout << "t = " << t << endl;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			alpha[t][k] = 0;
 			double prod_scaling = 1;
@@ -168,7 +168,6 @@ double enumerate_forward_probability_scaling(double*** p_transition, double** al
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			sum_alpha += alpha[t][k];
 		}
-		// assert(sum_alpha <= 1.0);
 		scaling[t] = 1.0 / sum_alpha;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			alpha[t][k] *= scaling[t];
@@ -191,7 +190,6 @@ double enumerate_forward_probability_scaling(double*** p_transition, double** al
 // 高速版
 double _enumerate_forward_probability_scaling(double*** p_transition, double** alpha, double* scaling, int seq_length, int max_word_length){
 	for(int t = 1;t <= seq_length;t++){
-		// cout << "t = " << t << endl;
 		double prod_scaling = 1;
 		double sum_alpha = 0;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
@@ -209,7 +207,6 @@ double _enumerate_forward_probability_scaling(double*** p_transition, double** a
 			}
 			sum_alpha += alpha[t][k];
 		}
-		// assert(sum_alpha <= 1.0);
 		scaling[t] = 1.0 / sum_alpha;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			alpha[t][k] *= scaling[t];
@@ -229,6 +226,40 @@ double _enumerate_forward_probability_scaling(double*** p_transition, double** a
 	return log_px;
 }
 
+double enumerate_backward_probability_scaling(double*** p_transition, double** beta, double* scaling, int seq_length, int max_word_length){
+	// <eos>への遷移を考える
+	int t = seq_length;
+	for(int k = 1;k <= std::min(seq_length, max_word_length);k++){
+		beta[t][k] = p_transition[t + 1][1][k];
+	}
+	for(int t = seq_length - 1;t >= 1;t--){
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			beta[t][k] = 0;
+			for(int j = 1;j <= std::min(seq_length - t, max_word_length);j++){
+				double prod_scaling = 1;
+				for(int m = t + 1;m <= t + j;m++){
+					prod_scaling *= scaling[m];
+				}
+				beta[t][k] += p_transition[t + j][j][k] * beta[t + j][j] * prod_scaling;
+			}
+		}
+	}
+	beta[0][1] = 0;
+	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
+		double prod_scaling = 1;
+		for(int m = 1;m <= j;m++){
+			prod_scaling *= scaling[m];
+		}
+		beta[0][1] += beta[j][j] * p_transition[j][j][0] * prod_scaling;
+	}
+	// cout << beta[0][1] << endl;
+	double log_px = 0;
+	for(int m = 1;m <= seq_length;m++){
+		log_px += log(1.0 / scaling[m]);
+	}
+	return log(beta[0][1]) + log_px;
+}
+
 void init_log_z(double* log_z, int seq_length){
 	for(int t = 0;t <= seq_length;t++){
 		log_z[t] = -1;
@@ -237,7 +268,7 @@ void init_log_z(double* log_z, int seq_length){
 
 // tは番号なので1から始まることに注意
 int main(int argc, char *argv[]){
-	int seq_length = 100;
+	int seq_length = 110;
 	int max_word_length = 10;
 	// 前向き確率
 	double** alpha = new double*[seq_length + 1];
@@ -331,8 +362,17 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "logsumexp:	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_scaling_backward = enumerate_backward_probability_scaling(p_transition, beta, scaling, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "scaling:	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
 	cout << log_px_true_backward << endl;
 	cout << log_px_logsumexp_backward << endl;
+	cout << log_px_scaling_backward << endl;
 
 	for(int t = 0;t < seq_length + 1;t++){
 		for(int k = 0;k < max_word_length + 1;k++){
