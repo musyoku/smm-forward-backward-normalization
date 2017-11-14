@@ -430,6 +430,7 @@ int main(int argc, char *argv[]){
 	double log_px_true_forward, log_px_logsumexp_forward, _log_px_logsumexp_forward, log_px_scaling_forward, _log_px_scaling_forward;
 	double log_px_true_backward, log_px_logsumexp_backward, _log_px_logsumexp_backward, log_px_scaling_backward, _log_px_scaling_backward;
 
+	cout << "bigram:" << endl;
 	cout << "forward variables:" << endl;
 	cout << "	time:" << endl;
 
@@ -441,14 +442,14 @@ int main(int argc, char *argv[]){
 	auto diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	init_log_z(log_z, seq_length);
-	start = std::chrono::system_clock::now();
-	for(int r = 0;r < repeat;r++){
-		log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
-	}
-	end = std::chrono::system_clock::now();
-	diff = end - start;
-	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	// init_log_z(log_z, seq_length);
+	// start = std::chrono::system_clock::now();
+	// for(int r = 0;r < repeat;r++){
+	// 	log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
+	// }
+	// end = std::chrono::system_clock::now();
+	// diff = end - start;
+	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
@@ -457,15 +458,15 @@ int main(int argc, char *argv[]){
 	}
 	end = std::chrono::system_clock::now();
 	diff = end - start;
-	cout << "		logsumexp(fast):	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	start = std::chrono::system_clock::now();
-	for(int r = 0;r < repeat;r++){
-		log_px_scaling_forward = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
-	}
-	end = std::chrono::system_clock::now();
-	diff = end - start;
-	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	// start = std::chrono::system_clock::now();
+	// for(int r = 0;r < repeat;r++){
+	// 	log_px_scaling_forward = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
+	// }
+	// end = std::chrono::system_clock::now();
+	// diff = end - start;
+	// cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -473,13 +474,13 @@ int main(int argc, char *argv[]){
 	}
 	end = std::chrono::system_clock::now();
 	diff = end - start;
-	cout << "		scaling(fast):		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	cout << "	logP(x):" << endl;
 	cout << "		" << std::setprecision(16) << log_px_true_forward << endl;
-	cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
+	// cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_logsumexp_forward << endl;
-	cout << "		" << std::setprecision(16) << log_px_scaling_forward << endl;
+	// cout << "		" << std::setprecision(16) << log_px_scaling_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_forward << endl;
 
 	cout << "backward variables:" << endl;
@@ -493,14 +494,14 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	init_log_z(log_z, seq_length);
-	start = std::chrono::system_clock::now();
-	for(int r = 0;r < repeat;r++){
-		log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
-	}
-	end = std::chrono::system_clock::now();
-	diff = end - start;
-	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	// init_log_z(log_z, seq_length);
+	// start = std::chrono::system_clock::now();
+	// for(int r = 0;r < repeat;r++){
+	// 	log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
+	// }
+	// end = std::chrono::system_clock::now();
+	// diff = end - start;
+	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
@@ -509,15 +510,15 @@ int main(int argc, char *argv[]){
 	}
 	end = std::chrono::system_clock::now();
 	diff = end - start;
-	cout << "		logsumexp(fast):	" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	start = std::chrono::system_clock::now();
-	for(int r = 0;r < repeat;r++){
-		log_px_scaling_backward = enumerate_backward_probability_scaling(p_transition, beta, scaling, seq_length, max_word_length);
-	}
-	end = std::chrono::system_clock::now();
-	diff = end - start;
-	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	// start = std::chrono::system_clock::now();
+	// for(int r = 0;r < repeat;r++){
+	// 	log_px_scaling_backward = enumerate_backward_probability_scaling(p_transition, beta, scaling, seq_length, max_word_length);
+	// }
+	// end = std::chrono::system_clock::now();
+	// diff = end - start;
+	// cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -525,13 +526,13 @@ int main(int argc, char *argv[]){
 	}
 	end = std::chrono::system_clock::now();
 	diff = end - start;
-	cout << "		scaling(fast):		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	cout << "	logP(x):" << endl;
 	cout << "		" << std::setprecision(16) << log_px_true_backward << endl;
-	cout << "		" << std::setprecision(16) << log_px_logsumexp_backward << endl;
+	// cout << "		" << std::setprecision(16) << log_px_logsumexp_backward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_logsumexp_backward << endl;
-	cout << "		" << std::setprecision(16) << log_px_scaling_backward << endl;
+	// cout << "		" << std::setprecision(16) << log_px_scaling_backward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_backward << endl;
 
 	for(int t = 0;t < seq_length + 1;t++){
