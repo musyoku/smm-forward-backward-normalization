@@ -63,6 +63,84 @@ double enumerate_backward_probability_naive(double**** p_transition, double*** b
 	return log(px);
 }
 
+double enumerate_forward_probability_logsumexp(double**** p_transition, double*** alpha, double* log_z, int seq_length, int max_word_length){
+	alpha[0][0][0] = 1;
+	log_z[0] = 0;
+	for(int t = 1;t <= seq_length;t++){
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			if(t - k == 0){
+				alpha[t][k][0] = p_transition[t][k][0][0];
+				continue;
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				if(t - k - j == 0){
+					alpha[t][k][j] = p_transition[t][k][j][0] * alpha[t - k][j][0];
+					continue;
+				}
+				alpha[t][k][j] = 0;
+				for(int i = 1;i <= std::min(t - k, max_word_length);i++){
+					alpha[t][k][j] += p_transition[t][k][j][i] * alpha[t - k][j][i];
+				}
+			}
+		}
+		// 正規化
+		// 分配関数はkとjを網羅する
+		double sum_exp = 0;
+		// 最大値を求める
+		double max_log_z = 0;
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			if(t - k == 0){
+				assert(alpha[t][k][0] > 0);
+				double tmp = log(alpha[t][k][0]) + log_z[t - k];
+				if(max_log_z == 0 || tmp > max_log_z){
+					max_log_z = tmp;
+				}
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				assert(alpha[t][k][j] > 0);
+				double tmp = log(alpha[t][k][j]) + log_z[t - k];
+				if(max_log_z == 0 || tmp > max_log_z){
+					max_log_z = tmp;
+				}
+			}
+		}
+		// 求めた最大値をもとにlogsumexp
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			if(t - k == 0){
+				sum_exp += exp(log(alpha[t][k][0]) + log_z[t - k] - max_log_z);
+				continue;
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				assert(alpha[t][k][j] > 0);
+				sum_exp += exp(log(alpha[t][k][j]) + log_z[t - k] - max_log_z);
+			}
+		}
+		double log_z_t = log(sum_exp) + max_log_z;
+		// 正規化
+		assert(log_z_t != 0);
+		for(int k = 1;k <= std::min(t, max_word_length);k++){
+			if(t - k == 0){
+				alpha[t][k][0] = exp(log(alpha[t][k][0]) + log_z[t - k] - log_z_t);
+				assert(alpha[t][k][0] > 0);
+				continue;
+			}
+			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+				alpha[t][k][j] = exp(log(alpha[t][k][j]) + log_z[t - k] - log_z_t);
+				assert(alpha[t][k][j] > 0);
+			}
+		}
+		log_z[t] = log_z_t;
+	}
+	double alpha_t_1 = 0;
+	int t = seq_length + 1;
+	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
+		for(int i = 1;i <= std::min(seq_length - j, max_word_length);i++){
+			alpha_t_1 += p_transition[t][1][j][i] * alpha[t - 1][j][i];
+		}
+	}
+	return log(alpha_t_1) + log_z[t - 1];
+}
+
 void init_log_z(double* log_z, int seq_length){
 	for(int t = 0;t <= seq_length;t++){
 		log_z[t] = 0;
@@ -129,9 +207,17 @@ int main(int argc, char *argv[]){
 	auto diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+
 	cout << "	logP(x):" << endl;
 	cout << "		" << std::setprecision(16) << log_px_true_forward << endl;
-	// cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
+	cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_logsumexp_forward << endl;
 	// cout << "		" << std::setprecision(16) << log_px_scaling_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_forward << endl;

@@ -52,6 +52,7 @@ double enumerate_backward_probability_naive(double*** p_transition, double** bet
 }
 
 double enumerate_forward_probability_logsumexp(double*** p_transition, double** alpha, double* log_z, int seq_length, int max_word_length){
+	log_z[0] = 0;
 	for(int t = 1;t <= seq_length;t++){
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			if(t - k == 0){		// <bos>からの遷移
@@ -100,6 +101,7 @@ double enumerate_forward_probability_logsumexp(double*** p_transition, double** 
 
 // 高速版
 double _enumerate_forward_probability_logsumexp(double*** p_transition, double** alpha, double* log_z, double* log_exp_cache, int seq_length, int max_word_length){
+	log_z[0] = 0;
 	for(int t = 1;t <= seq_length;t++){
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			if(t - k == 0){		// <bos>からの遷移
@@ -149,6 +151,7 @@ double _enumerate_forward_probability_logsumexp(double*** p_transition, double**
 
 // 時刻tでbeta[t + k][k]を全てのkについて更新する
 double enumerate_backward_probability_logsumexp(double*** p_transition, double** beta, double* log_z, int seq_length, int max_word_length){
+	log_z[0] = 0;
 	int t = seq_length;
 	beta[t + 1][1] = 1;
 	log_z[t + 1] = 0; 		// log(1) = 0
@@ -195,6 +198,7 @@ double enumerate_backward_probability_logsumexp(double*** p_transition, double**
 
 // 高速版
 double _enumerate_backward_probability_logsumexp(double*** p_transition, double** beta, double* log_z, double* log_exp_cache, int seq_length, int max_word_length){
+	log_z[0] = 0;
 	int t = seq_length;
 	beta[t + 1][1] = 1;
 	log_z[t + 1] = 0; 		// log(1) = 0
@@ -385,12 +389,6 @@ double _enumerate_backward_probability_scaling(double*** p_transition, double** 
 	return log(beta[0][1]) + log_px;
 }
 
-void init_log_z(double* log_z, int seq_length){
-	for(int t = 0;t <= seq_length;t++){
-		log_z[t] = 0;
-	}
-}
-
 // tは番号なので1から始まることに注意
 int main(int argc, char *argv[]){
 	int seq_length = 1000;
@@ -442,7 +440,6 @@ int main(int argc, char *argv[]){
 	auto diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// init_log_z(log_z, seq_length);
 	// start = std::chrono::system_clock::now();
 	// for(int r = 0;r < repeat;r++){
 	// 	log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
@@ -451,7 +448,6 @@ int main(int argc, char *argv[]){
 	// diff = end - start;
 	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
 		_log_px_logsumexp_forward = _enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, log_exp_cache, seq_length, max_word_length);
@@ -494,7 +490,6 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// init_log_z(log_z, seq_length);
 	// start = std::chrono::system_clock::now();
 	// for(int r = 0;r < repeat;r++){
 	// 	log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
@@ -503,7 +498,6 @@ int main(int argc, char *argv[]){
 	// diff = end - start;
 	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	init_log_z(log_z, seq_length);
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
 		_log_px_logsumexp_backward = _enumerate_backward_probability_logsumexp(p_transition, beta, log_z, log_exp_cache, seq_length, max_word_length);
