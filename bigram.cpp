@@ -535,12 +535,14 @@ int main(int argc, char *argv[]){
 	// cout << "		" << std::setprecision(16) << log_px_scaling_backward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_backward << endl;
 
-	for(int t = 0;t < seq_length + 1;t++){
+	for(int t = 0;t <= seq_length;t++){
+		delete[] alpha[t];
+	}
+	for(int t = 0;t <= seq_length + 1;t++){
 		for(int k = 0;k < max_word_length + 1;k++){
 			delete[] p_transition[t][k];
 		}
 		delete[] p_transition[t];
-		delete[] alpha[t];
 		delete[] beta[t];
 	}
 	delete[] p_transition;
