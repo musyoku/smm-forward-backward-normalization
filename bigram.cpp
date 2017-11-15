@@ -154,7 +154,7 @@ double enumerate_backward_probability_logsumexp(double*** p_transition, double**
 	log_z[0] = 0;
 	int t = seq_length;
 	beta[t + 1][1] = 1;
-	log_z[t + 1] = 0; 		// log(1) = 0
+	log_z[t] = 0; 		// log(1) = 0
 	for(int t = seq_length - 1;t >= 0;t--){
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
 			beta[t + k][k] = 0;
@@ -171,7 +171,7 @@ double enumerate_backward_probability_logsumexp(double*** p_transition, double**
 		// 最大値を求める
 		double max_log_z = 0;
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
-			double tmp = log(beta[t + k][k]) + log_z[t + k + 1];
+			double tmp = log(beta[t + k][k]) + log_z[t + k];
 			if(max_log_z == 0 || tmp > max_log_z){
 				max_log_z = tmp;
 			}
@@ -179,19 +179,19 @@ double enumerate_backward_probability_logsumexp(double*** p_transition, double**
 		// 求めた最大値をもとにlogsumexp
 		double sum_exp = 0;
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
-			sum_exp += exp(log(beta[t + k][k]) + log_z[t + k + 1] - max_log_z);
+			sum_exp += exp(log(beta[t + k][k]) + log_z[t + k] - max_log_z);
 		}
 		double log_z_t = log(sum_exp) + max_log_z;
 		// 正規化
 		assert(log_z_t != 0);
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
-			beta[t + k][k] = exp(log(beta[t + k][k]) + log_z[t + k + 1] - log_z_t);
+			beta[t + k][k] = exp(log(beta[t + k][k]) + log_z[t + k] - log_z_t);
 		}
-		log_z[t + 1] = log_z_t;
+		log_z[t] = log_z_t;
 	}
 	double px = 0;
 	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
-		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[1]);
+		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[0]);
 	}
 	return log(px);
 }
@@ -201,7 +201,7 @@ double _enumerate_backward_probability_logsumexp(double*** p_transition, double*
 	log_z[0] = 0;
 	int t = seq_length;
 	beta[t + 1][1] = 1;
-	log_z[t + 1] = 0; 		// log(1) = 0
+	log_z[t] = 0; 		// log(1) = 0
 	for(int t = seq_length - 1;t >= 0;t--){
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
 			beta[t + k][k] = 0;
@@ -218,7 +218,7 @@ double _enumerate_backward_probability_logsumexp(double*** p_transition, double*
 		// 最大値を求める
 		double max_log_z = 0;
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
-			double tmp = log(beta[t + k][k]) + log_z[t + k + 1];
+			double tmp = log(beta[t + k][k]) + log_z[t + k];
 			if(max_log_z == 0 || tmp > max_log_z){
 				max_log_z = tmp;
 			}
@@ -235,11 +235,11 @@ double _enumerate_backward_probability_logsumexp(double*** p_transition, double*
 		for(int k = 1;k <= std::min(seq_length - t, max_word_length);k++){
 			beta[t + k][k] = exp(log_exp_cache[k] - log_z_t);
 		}
-		log_z[t + 1] = log_z_t;
+		log_z[t] = log_z_t;
 	}
 	double px = 0;
 	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
-		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[1]);
+		px += p_transition[j][j][0] * beta[j][j] * exp(log_z[0]);
 	}
 	return log(px);
 }
@@ -440,13 +440,13 @@ int main(int argc, char *argv[]){
 	auto diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// start = std::chrono::system_clock::now();
-	// for(int r = 0;r < repeat;r++){
-	// 	log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
-	// }
-	// end = std::chrono::system_clock::now();
-	// diff = end - start;
-	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_logsumexp_forward = enumerate_forward_probability_logsumexp(p_transition, alpha, log_z, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -456,13 +456,13 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// start = std::chrono::system_clock::now();
-	// for(int r = 0;r < repeat;r++){
-	// 	log_px_scaling_forward = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
-	// }
-	// end = std::chrono::system_clock::now();
-	// diff = end - start;
-	// cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_scaling_forward = enumerate_forward_probability_scaling(p_transition, alpha, scaling, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -474,9 +474,9 @@ int main(int argc, char *argv[]){
 
 	cout << "	logP(x):" << endl;
 	cout << "		" << std::setprecision(16) << log_px_true_forward << endl;
-	// cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
+	cout << "		" << std::setprecision(16) << log_px_logsumexp_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_logsumexp_forward << endl;
-	// cout << "		" << std::setprecision(16) << log_px_scaling_forward << endl;
+	cout << "		" << std::setprecision(16) << log_px_scaling_forward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_forward << endl;
 
 	cout << "backward variables:" << endl;
@@ -490,13 +490,13 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "		naive:			" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// start = std::chrono::system_clock::now();
-	// for(int r = 0;r < repeat;r++){
-	// 	log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
-	// }
-	// end = std::chrono::system_clock::now();
-	// diff = end - start;
-	// cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_logsumexp_backward = enumerate_backward_probability_logsumexp(p_transition, beta, log_z, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -506,13 +506,13 @@ int main(int argc, char *argv[]){
 	diff = end - start;
 	cout << "		logsumexp:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
-	// start = std::chrono::system_clock::now();
-	// for(int r = 0;r < repeat;r++){
-	// 	log_px_scaling_backward = enumerate_backward_probability_scaling(p_transition, beta, scaling, seq_length, max_word_length);
-	// }
-	// end = std::chrono::system_clock::now();
-	// diff = end - start;
-	// cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
+	start = std::chrono::system_clock::now();
+	for(int r = 0;r < repeat;r++){
+		log_px_scaling_backward = enumerate_backward_probability_scaling(p_transition, beta, scaling, seq_length, max_word_length);
+	}
+	end = std::chrono::system_clock::now();
+	diff = end - start;
+	cout << "		scaling:		" << (std::chrono::duration_cast<std::chrono::milliseconds>(diff).count() / (double)repeat) << " [msec]" << endl;
 
 	start = std::chrono::system_clock::now();
 	for(int r = 0;r < repeat;r++){
@@ -524,9 +524,9 @@ int main(int argc, char *argv[]){
 
 	cout << "	logP(x):" << endl;
 	cout << "		" << std::setprecision(16) << log_px_true_backward << endl;
-	// cout << "		" << std::setprecision(16) << log_px_logsumexp_backward << endl;
+	cout << "		" << std::setprecision(16) << log_px_logsumexp_backward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_logsumexp_backward << endl;
-	// cout << "		" << std::setprecision(16) << log_px_scaling_backward << endl;
+	cout << "		" << std::setprecision(16) << log_px_scaling_backward << endl;
 	cout << "		" << std::setprecision(16) << _log_px_scaling_backward << endl;
 
 	for(int t = 0;t <= seq_length;t++){
