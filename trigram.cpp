@@ -74,14 +74,7 @@ double enumerate_forward_probability_logsumexp(double**** p_transition, double**
 		// 最大値を求める
 		double max_log_z = 0;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
-			if(t - k == 0){
-				assert(alpha[t][k][0] > 0);
-				double tmp = log(alpha[t][k][0]) + log_z[t - k];
-				if(max_log_z == 0 || tmp > max_log_z){
-					max_log_z = tmp;
-				}
-			}
-			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				assert(alpha[t][k][j] > 0);
 				double tmp = log(alpha[t][k][j]) + log_z[t - k];
 				if(max_log_z == 0 || tmp > max_log_z){
@@ -92,11 +85,7 @@ double enumerate_forward_probability_logsumexp(double**** p_transition, double**
 		// 求めた最大値をもとにlogsumexp
 		double sum_exp = 0;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
-			if(t - k == 0){
-				sum_exp += exp(log(alpha[t][k][0]) + log_z[t - k] - max_log_z);
-				continue;
-			}
-			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				assert(alpha[t][k][j] > 0);
 				sum_exp += exp(log(alpha[t][k][j]) + log_z[t - k] - max_log_z);
 			}
@@ -105,12 +94,7 @@ double enumerate_forward_probability_logsumexp(double**** p_transition, double**
 		// 正規化
 		assert(log_z_t != 0);
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
-			if(t - k == 0){
-				alpha[t][k][0] = exp(log(alpha[t][k][0]) + log_z[t - k] - log_z_t);
-				assert(alpha[t][k][0] > 0);
-				continue;
-			}
-			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				alpha[t][k][j] = exp(log(alpha[t][k][j]) + log_z[t - k] - log_z_t);
 				assert(alpha[t][k][j] > 0);
 			}
@@ -120,11 +104,8 @@ double enumerate_forward_probability_logsumexp(double**** p_transition, double**
 	double alpha_t_1 = 0;
 	int t = seq_length + 1;
 	int k = 1;
-	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
-		if(t - k - j == 0){
-			alpha_t_1 += p_transition[t][k][j][0] * alpha[t - k][j][0];
-		}
-		for(int i = 1;i <= std::min(seq_length - j, max_word_length);i++){
+	for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
+		for(int i = (t - k - j == 0) ? 0 : 1;i <= std::min(t - k - j, max_word_length);i++){
 			alpha_t_1 += p_transition[t][k][j][i] * alpha[t - k][j][i];
 		}
 	}
@@ -136,9 +117,9 @@ double enumerate_backward_probability_logsumexp(double**** p_transition, double*
 	log_z[0] = 0;
 	int t = seq_length;
 	log_z[t] = 0; 		// log(1) = 0
-	for(int j = 1;j <= std::min(seq_length, max_word_length);j++){
-		for(int i = 0;i <= std::min(seq_length - j, max_word_length);i++){
-			beta[t][j][i] = p_transition[t + 1][1][j][i];
+	for(int k = 1;k <= std::min(t, max_word_length);k++){
+		for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
+			beta[t][k][j] = p_transition[t + 1][1][k][j];
 		}
 	}
 	for(int t = seq_length - 1;t >= 0;t--){
@@ -190,23 +171,16 @@ double enumerate_backward_probability_logsumexp(double**** p_transition, double*
 }
 
 double enumerate_forward_probability_scaling(double**** p_transition, double*** alpha, double* scaling, int seq_length, int max_word_length){
+	alpha[0][0][0] = 1;
 	for(int t = 1;t <= seq_length;t++){
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
 			double prod_scaling = 1;
 			for(int m = t - k + 1;m <= t - 1;m++){
 				prod_scaling *= scaling[m];
 			}
-			if(t - k == 0){
-				alpha[t][k][0] = p_transition[t][k][0][0] * prod_scaling;
-				continue;
-			}
-			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
-				if(t - k - j == 0){
-					alpha[t][k][j] = p_transition[t][k][j][0] * alpha[t - k][j][0] * prod_scaling;
-					continue;
-				}
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				alpha[t][k][j] = 0;
-				for(int i = 1;i <= std::min(t - k, max_word_length);i++){
+				for(int i = (t - k - j == 0) ? 0 : 1;i <= std::min(t - k - j, max_word_length);i++){
 					alpha[t][k][j] += p_transition[t][k][j][i] * alpha[t - k][j][i] * prod_scaling;
 				}
 			}
@@ -214,22 +188,14 @@ double enumerate_forward_probability_scaling(double**** p_transition, double*** 
 		}
 		double sum_alpha = 0;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
-			if(t - k == 0){
-				sum_alpha += alpha[t][k][0];
-				continue;
-			}
-			for(int j = 1;j <= std::min(t - k, max_word_length);j++){
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				sum_alpha += alpha[t][k][j];
 			}
 		}
 		assert(sum_alpha > 0);
 		scaling[t] = 1.0 / sum_alpha;
 		for(int k = 1;k <= std::min(t, max_word_length);k++){
-			if(t - k == 0){
-				alpha[t][k][0] *= scaling[t];
-				continue;
-			}
-			for(int j = 0;j <= std::min(t - k, max_word_length);j++){
+			for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
 				alpha[t][k][j] *= scaling[t];
 			}
 		}
@@ -238,12 +204,8 @@ double enumerate_forward_probability_scaling(double**** p_transition, double*** 
 	double alpha_t_1 = 0;
 	int t = seq_length + 1;
 	int k = 1;
-	for(int j = 1;j <= std::min(t, max_word_length);j++){
-		if(t - k - j == 0){
-			alpha_t_1 += alpha[t - k][j][0] * p_transition[t][k][j][0];
-			continue;
-		}
-		for(int i = 1;i <= std::min(t - k - j, max_word_length);i++){
+	for(int j = (t - k == 0) ? 0 : 1;j <= std::min(t - k, max_word_length);j++){
+		for(int i = (t - k - j == 0) ? 0 : 1;i <= std::min(t - k - j, max_word_length);i++){
 			alpha_t_1 += alpha[t - k][j][i] * p_transition[t][k][j][i];
 		}
 	}
