@@ -524,7 +524,8 @@ int main(int argc, char *argv[]){
 	double log_px_true_forward, log_px_logsumexp_forward, _log_px_logsumexp_forward, log_px_scaling_forward, _log_px_scaling_forward;
 	double log_px_true_backward, log_px_logsumexp_backward, _log_px_logsumexp_backward, log_px_scaling_backward, _log_px_scaling_backward;
 
-	cout << "trigram:" << endl;
+	cout << "trigram forward-backward" << endl;
+	cout << "seq_length = " << seq_length << endl;
 	cout << "forward variables:" << endl;
 	cout << "	time:" << endl;
 
